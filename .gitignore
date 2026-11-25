@@ -1,0 +1,10 @@
+node_modules/
+apps/*/out/
+.state/
+
+# brainstorm notes and plans stay local
+.superpowers/
+docs/superpowers/
+
+# secrets (ElevenLabs key)
+.env

@@ -56,7 +56,7 @@ import { config as looks } from "../apps/looks/reel.config";
 import { LookFilm, loadLookFonts } from "./kit/looks/Film";
 import { STILLS as STRANGERS_STILLS, StrangersReel, loadStrangers } from "../apps/strangers/Reel";
 import { config as strangers } from "../apps/strangers/reel.config";
-import { FILM as PORCHLIGHT, PREVIEW as PORCHLIGHT_PREVIEW, STILLS as PORCHLIGHT_STILLS } from "../apps/porchlight/Reel";
+import { COMPARE as PORCHLIGHT_COMPARE, FILM as PORCHLIGHT, PREVIEW as PORCHLIGHT_PREVIEW, STILLS as PORCHLIGHT_STILLS } from "../apps/porchlight/Reel";
 import { config as porchlight } from "../apps/porchlight/reel.config";
 import { CosmicEggReel, STILLS as EGG_STILLS } from "../apps/cosmic-egg/Reel";
 import { config as cosmicEgg } from "../apps/cosmic-egg/reel.config";
@@ -299,6 +299,7 @@ export function Root() {
       <Composition id="middle-mocks" component={MiddleReel} width={middle.width} height={middle.height} fps={middle.fps} durationInFrames={MIDDLE_MOCKS.length} defaultProps={{ at: MIDDLE_MOCKS }} calculateMetadata={async ({ props }) => ({ props: { ...props, spoken: await loadMiddle() } })} />
       <Composition id="porchlight" component={(p: { step?: number; at?: number[] }) => <LookFilm film={PORCHLIGHT} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={porchlight.seconds * porchlight.fps} defaultProps={{ step: 1 }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       <Composition id="porchlight-preview" component={(p: { step?: number }) => <LookFilm film={PORCHLIGHT_PREVIEW} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={porchlight.seconds * 4} defaultProps={{ step: 7.5 }} calculateMetadata={async () => (await loadLookFonts(), {})} />
+      <Composition id="porchlight-compare" component={(p: { at?: number[] }) => <LookFilm film={PORCHLIGHT} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={PORCHLIGHT_COMPARE.length} defaultProps={{ at: PORCHLIGHT_COMPARE }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       <Composition id="porchlight-stills" component={(p: { step?: number; at?: number[] }) => <LookFilm film={PORCHLIGHT} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={PORCHLIGHT_STILLS.length} defaultProps={{ at: PORCHLIGHT_STILLS }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       {/* Paper, box and dots: the demo film of each, a contact sheet of it, and the parts each look has. */}
       {LOOKS.flatMap(({ id, film, stills }) => {

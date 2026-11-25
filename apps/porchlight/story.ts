@@ -2,10 +2,10 @@
 // Everything here is a function of the film's time: who stands where, the camera, the sky, the season, the weather.
 // The boy's puppy bolts in a storm and runs over the hill, where a girl takes it in. He never finds it; he leaves the
 // light at the gate on every night of his life, until the evening he switches it off himself.
-import { DAY, DUSK, NIGHT, boxLook, landAt, mixSky, type BoxCamera, type BoxWorld, type Land, type Pose, type Sky } from "../../src/kit/looks/box/world";
+import { DAY, DUSK, NIGHT, boxLook, landAt, mixGrade, mixSky, project, type BoxCamera, type BoxWorld, type Grade, type Land, type Pose, type Sky } from "../../src/kit/looks/box/world";
 import * as box from "../../src/kit/looks/box/things";
 import { H, TAU, W, clamp01, smooth, type Painter, type RGB, type V3 } from "../../src/kit/looks/core";
-import { GLASS, bench, crate, fence, grave, lantern, laundry, oak, postLamp, sheet, swingSeat } from "./props";
+import { CHIMNEY, GLASS, bench, cottage, crate, fence, lantern, laundry, oak, postLamp, sheet, swingSeat } from "./props";
 
 export const SECONDS = 120;
 
@@ -16,8 +16,9 @@ export const LAND: Land = {
     { amp: 0.25, fx: 2.33, fz: 0.35, px: Math.PI / 2 },
     { amp: 0.025, fx: 3.7, fz: 2.9, px: 0.4 },
   ],
-  tufts: 0.26,
+  tufts: 0.42,
   tuftSize: 0.4,
+  rich: { flowers: [[0.97, 0.84, 0.3], [0.97, 0.96, 0.93], [0.9, 0.48, 0.72], [0.62, 0.62, 0.97]] },
   path: { points: [[-1.56, -0.12], [-1.42, 0.3], [-1.35, 0.75], [-0.9, 1.05], [0, 1.15], [0.9, 1.05], [1.3, 0.6], [1.14, -0.12]], width: 0.12, color: [0.6, 0.48, 0.34] },
   colorsAt: (t) => seasonColors(seasonAt(t)),
 };
@@ -36,7 +37,8 @@ const BENCH: [number, number] = [-1.86, 0.42];
 const CRATE: [number, number] = [-1.2, 0.3];
 const OAK: [number, number] = [0, -0.35];
 const GTREE: [number, number] = [1.72, 0.22];
-const GRAVE: [number, number] = [1.55, 0.55];
+/** The dog's favourite spot, under her tree, looking back over the hill at his lamp. */
+const SPOT: [number, number] = [1.55, 0.55];
 const LINE: [number, number] = [-0.98, 0.22];
 /** Where the dog shivers, by the girl's door. */
 const SHELTER: [number, number] = [GX + 0.02, FRONT + 0.1];
@@ -80,6 +82,16 @@ function circling(c: XZ, r: number, t0: number, t1: number, laps: number) {
   };
 }
 
+type Face = { smile?: number; shut?: number; look?: number };
+/** Sets a person's face (k[4]…k[6]) from a list of [from, face]: each face holds until the next. */
+function faced(raw: (t: number) => Pose, faces: [number, Face][]): (t: number) => Pose {
+  return (t) => {
+    const p = raw(t), f = [...faces].reverse().find(([at]) => t >= at)?.[1] ?? {};
+    const k = p.k ?? [];
+    return { ...p, k: [k[0] ?? 0, k[1] ?? 0, k[2] ?? 0, k[3] ?? 0, f.smile ?? 0.3, f.shut ?? 0, f.look ?? 0] };
+  };
+}
+
 /** Softens a character's moves: where they are, which way they face and how they sit are averaged over a moment either
  *  side, within the shot, so nobody snaps from one move to the next. Strides and wagging (k[0], k[1]) stay sharp. */
 function steady(raw: (t: number) => Pose): (t: number) => Pose {
@@ -105,7 +117,7 @@ function steady(raw: (t: number) => Pose): (t: number) => Pose {
       ...now,
       at: [average(0.1, (p) => p.at[0]), average(0.05, (p) => p.at[1]), average(0.1, (p) => p.at[2])],
       turn: average(0.18, (p) => p.turn ?? 0, true),
-      k: [k[0], k[1], average(0.12, (p) => p.k?.[2] ?? 0), average(0.12, (p) => p.k?.[3] ?? 0)],
+      k: [k[0], k[1], average(0.12, (p) => p.k?.[2] ?? 0), average(0.12, (p) => p.k?.[3] ?? 0), ...(k.length > 4 ? [4, 5, 6].map((j) => average(0.3, (p) => p.k?.[j] ?? 0)) : [])],
     };
   };
 }
@@ -159,7 +171,7 @@ const lovers = route([[-1.0, 1.0], [-0.4, 1.12], [0.1, 1.13]], 64, 67.8);
 const toLampOld = route([[BENCH[0], BENCH[1] + 0.02], [LAMP[0] + 0.06, LAMP[1] - 0.14]], 103.6, 105.2);
 const goingIn = route([[LAMP[0] + 0.06, LAMP[1] - 0.14], [-1.45, 0.3], [-1.5, 0.05], DOOR, IN], 107.4, 110);
 
-const hero = steady((t: number): Pose => {
+const hero = steady(faced((t: number): Pose => {
   // The hook: old, on the bench by the lit lamp at nightfall.
   if (t < 6) return onBench(OLD);
   // The puppy.
@@ -205,9 +217,9 @@ const hero = steady((t: number): Pose => {
   if (within(t, 105.2, 107.4)) return person(OLD, LAMP[0] + 0.06, LAMP[1] - 0.14, FACE_Z, { arm: smooth(105.3, 106, t) * (1 - smooth(106.6, 107.2, t)) * 0.75 });
   if (within(t, 107.4, 110)) return walking(OLD, goingIn(t));
   return HIDE;
-});
+}, [[0, { smile: 0.15, look: 0.2 }], [6, { smile: 1 }], [20, { smile: 0.8 }], [27.6, { smile: -0.3 }], [28.4, { smile: 1 }], [30, { smile: -0.8 }], [40, { smile: -0.9 }], [49, { smile: -0.7, shut: 0.3 }], [53, { smile: 0 }], [55.2, { smile: 0.35 }], [60, { smile: 0.7 }], [80, { smile: 0.6 }], [92, { smile: 0.75 }], [95.6, { smile: -0.35, shut: 0.15 }], [100, { smile: 0.15, look: 0.2 }], [106.3, { smile: 0.95, shut: 0.35 }]]));
 
-const wife = steady((t: number): Pose => {
+const wife = steady(faced((t: number): Pose => {
   if (within(t, 64, 68)) {
     const w = lovers(t);
     return person(YOUNG, w.x + 0.12, w.z - 0.17, w.turn, { d: w.d + 0.05, moving: w.moving, arm: 0.15 });
@@ -217,9 +229,9 @@ const wife = steady((t: number): Pose => {
   if (within(t, 80, 84)) return onBench(GREYING, 1);
   if (within(t, 92, 95.6)) return onBench(OLD, -1);
   return HIDE;
-});
+}, [[0, { smile: 0.8 }], [92, { smile: 0.75 }]]));
 
-const kid = steady((t: number): Pose => {
+const kid = steady(faced((t: number): Pose => {
   if (within(t, 72, 76)) {
     const w = circling([-1.35, 0.3], 0.22, 72.2, 75.8, 2);
     return walking(CHILD, w(t), { run: true });
@@ -231,11 +243,11 @@ const kid = steady((t: number): Pose => {
     return walking(CHILD, w, { run: true, dy: hop(t, 116.8, 120, 8, 0.02) });
   }
   return HIDE;
-});
+}, [[0, { smile: 1 }]]));
 
 const girlWalk = route([[GX - 0.4, 0.5], [GX + 0.3, 0.55], [GX + 0.45, 0.2]], 64.2, 67.8);
-const girlHome = route([[GRAVE[0] - 0.05, GRAVE[1] + 0.33], [GX - 0.1, 0.3], GDOOR, GIN], 89.4, 92);
-const girl = steady((t: number): Pose => {
+const girlHome = route([[SPOT[0] - 0.05, SPOT[1] + 0.33], [GX - 0.1, 0.3], GDOOR, GIN], 89.4, 92);
+const girl = steady(faced((t: number): Pose => {
   if (within(t, 45.6, 46.6)) return walking(CHILD, route([GIN, GDOOR, [SHELTER[0] - 0.14, SHELTER[1] + 0.06]], 45.6, 46.6)(t));
   if (within(t, 46.6, 47.6)) return onGround(CHILD, SHELTER[0] - 0.14, SHELTER[1] + 0.06, FACE_X, { arm: 0.4 });
   if (within(t, 47.6, 49)) return walking(CHILD, route([[SHELTER[0] - 0.14, SHELTER[1] + 0.06], GDOOR, GIN], 47.6, 49)(t), { arm: 0.3 });
@@ -244,12 +256,12 @@ const girl = steady((t: number): Pose => {
   if (within(t, 68, 72)) return person(TEEN, GX - 0.05, FRONT + 0.2, FACE_Z);
   if (within(t, 72, 76)) return onGround(YOUNG, GX - 0.2, FRONT + 0.2, FACE_Z - 0.3, { arm: 0.15 });
   if (within(t, 76, 80)) return onGround(YOUNG, GTREE[0] - 0.25, GTREE[1] + 0.1, FACE_X);
-  if (within(t, 80, 84)) return onGround(MID, GRAVE[0] - 0.05, GRAVE[1] + 0.33, FACE_NZ + 0.2, { arm: 0.35 + 0.12 * Math.sin(t * 2) });
+  if (within(t, 80, 84)) return onGround(MID, SPOT[0] - 0.05, SPOT[1] + 0.33, FACE_NZ + 0.2, { arm: 0.35 + 0.12 * Math.sin(t * 2) });
   // She buries it under her tree, with the bandana.
-  if (within(t, 84, 89.4)) return onGround(MID, GRAVE[0] - 0.05, GRAVE[1] + 0.33, FACE_NZ + 0.2, { arm: within(t, 85, 87) ? 0.3 : 0 });
+  if (within(t, 84, 89.4)) return onGround(MID, SPOT[0] - 0.05, SPOT[1] + 0.33, FACE_NZ + 0.2, { arm: 0.3 + 0.1 * Math.sin(t * 1.6) });
   if (within(t, 89.4, 92)) return walking(MID, girlHome(t));
   return HIDE;
-});
+}, [[0, { smile: 0.5 }], [47.6, { smile: 0.8 }], [60, { smile: 0.9 }], [76, { smile: 0.3 }], [80, { smile: -0.4 }], [84, { smile: -0.7, shut: 0.45 }], [89.4, { smile: -0.2 }]]));
 
 // ── The dog ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -314,7 +326,17 @@ const theDog = steady((t: number): Pose => {
   if (within(t, 68, 72)) return dogAt({ scale: 0.95, age: 0.45 }, GX + 0.12, FRONT + 0.22, FACE_Z, { lie: 1, band: true, t, wag: 0.3 });
   if (within(t, 72, 76)) return dogAt({ scale: 0.95, age: 0.6 }, GX + 0.1, FRONT + 0.24, FACE_Z + 0.6, { lie: 1, band: true, t, wag: 0.4 });
   if (within(t, 76, 80)) return dogAt({ scale: 0.95, age: 0.85 }, GTREE[0] - 0.08, GTREE[1] + 0.12, FACE_NX, { lie: 1, band: true, t, wag: 0.15 });
-  if (within(t, 80, 84)) return dogAt({ scale: 0.95, age: 0.97 }, GRAVE[0], GRAVE[1] - 0.02, FACE_Z - 0.25, { lie: 1, band: true, t, wag: 0.05 });
+  if (within(t, 80, 84)) return dogAt({ scale: 0.95, age: 0.92 }, SPOT[0], SPOT[1] - 0.02, FACE_Z - 0.25, { lie: 1, band: true, t, wag: 0.1 });
+  // Dusk. Across the hill his lamp comes on; the old dog lifts its head towards it, and its tail moves.
+  if (within(t, 84, 89.4)) {
+    const up = smooth(LAMP_LIT[7] + 0.2, LAMP_LIT[7] + 1.1, t);
+    return dogAt({ scale: 0.95, age: 0.92 }, SPOT[0], SPOT[1] - 0.02, FACE_Z - 0.25 + 2.1 * up, { lie: 1 - 0.55 * up, band: true, t, wag: 0.05 + 0.4 * smooth(LAMP_LIT[7] + 1.2, LAMP_LIT[7] + 2, t) });
+  }
+  // It gets up slowly and follows her home.
+  if (within(t, 89.4, 92.2)) {
+    const w = route([[SPOT[0], SPOT[1] - 0.02], [SPOT[0] - 0.12, SPOT[1] + 0.15], [GX - 0.02, 0.32], GDOOR, GIN], 89.9, 92.2)(t);
+    return dogAt({ scale: 0.95, age: 0.92 }, w.x, w.z, w.turn, { d: w.d, moving: w.moving, t, band: true, wag: 0.3, lie: 0.55 * (1 - smooth(89.4, 89.9, t)) });
+  }
   return HIDE;
 });
 
@@ -386,6 +408,25 @@ const heroWindow = (t: number) => {
 };
 const girlWindow = (t: number) => (within(t, 45, 49) ? smooth(45.2, 45.6, t) : 0.85 * smooth(0.45, 0.7, darkness(t)));
 
+// ── Colour: one grade per chapter ──
+
+const G_NIGHT: Grade = { sat: 1.06, contrast: 1.06, warm: 0.55, shade: [-0.01, 0, 0.045] };
+const G_HONEY: Grade = { sat: 1.14, contrast: 1.05, warm: 0.75, shade: [0.035, 0.015, 0] };
+const G_STORM: Grade = { sat: 0.72, contrast: 1.12, warm: -0.45, shade: [0, 0.012, 0.045] };
+const G_DUSK: Grade = { sat: 1.1, contrast: 1.05, warm: 0.65, shade: [0.02, -0.005, 0.05] };
+const G_YEARS: Grade = { sat: 1.08, contrast: 1.04, warm: 0.3, shade: [0.012, 0.01, 0.02] };
+const G_GOLD: Grade = { sat: 1.12, contrast: 1.06, warm: 0.95, shade: [0.02, 0, 0.035] };
+const G_DAWN: Grade = { sat: 1.08, contrast: 1.02, warm: 0.45, shade: [0.035, 0, 0.04] };
+const GRADES: [number, Grade][] = [
+  [0, G_NIGHT], [5.999, G_NIGHT], [6, G_HONEY], [29.999, G_HONEY], [30, G_STORM], [52, G_STORM], [54, G_DUSK], [59.999, G_DUSK], [60, G_YEARS],
+  [83.999, G_YEARS], [84, G_DUSK], [99.999, G_DUSK], [100, G_GOLD], [104, G_GOLD], [109, G_NIGHT], [113, G_NIGHT], [116, G_DAWN],
+];
+function gradeAt(t: number) {
+  const i = Math.max(0, GRADES.findLastIndex(([at]) => at <= t));
+  const [a, A] = GRADES[i], [b, B] = GRADES[Math.min(i + 1, GRADES.length - 1)];
+  return mixGrade(A, B, b > a ? smooth(a, b, t) : 0);
+}
+
 // ── Seasons and weather ──────────────────────────────────────────────────────────────────────────────────────────
 
 /** 0 spring, 1 summer, 2 autumn, 3 winter, and on round again. */
@@ -411,7 +452,7 @@ const TUFT: RGB[] = [[0.5, 0.72, 0.4], [0.4, 0.6, 0.34], [0.72, 0.57, 0.3], [0.8
 const blend = (cs: RGB[], w: number[]): RGB => [0, 1, 2].map((c) => cs.reduce((a, col, i) => a + col[c] * w[i], 0)) as RGB;
 function seasonColors(s: number) {
   const w = seasonMix(s);
-  return { grass: [blend(GRASS.map((g) => g[0]), w), blend(GRASS.map((g) => g[1]), w)] as [RGB, RGB], tuft: blend(TUFT, w) };
+  return { grass: [blend(GRASS.map((g) => g[0]), w), blend(GRASS.map((g) => g[1]), w)] as [RGB, RGB], tuft: blend(TUFT, w), flowers: w[0] + 0.6 * w[1] + 0.1 * w[2], litter: 0.85 * w[2] };
 }
 /** Leaves for the trees: [autumn, snow, blossom]. */
 const leaves = (t: number) => {
@@ -430,19 +471,20 @@ const HERO: [RGB, RGB, { legs: RGB }] = [[0.76, 0.3, 0.22], [0.28, 0.17, 0.1], {
 const world: BoxWorld = {
   land: LAND,
   quality: 0.62,
+  lens: { aperture: 1, bloom: 0.55, grain: 0.06, vignette: 0.32, grade: (t) => gradeAt(t) },
   cull: true,
   tilt: 6,
   things: [
-    box.house({ at: ground(HX, HZ, -0.02), scale: 1.3, k: [0] }, [0.86, 0.76, 0.6], [0.6, 0.23, 0.18], [0.42, 0.5, 0.58]),
-    box.house({ at: ground(GX, HZ, -0.02), scale: 1.3, k: [0] }, [0.66, 0.74, 0.78], [0.3, 0.36, 0.5], [0.42, 0.5, 0.58]),
+    cottage({ at: ground(HX, HZ, -0.02), scale: 1.3, k: [0] }, [0.9, 0.8, 0.64], [0.66, 0.26, 0.2]),
+    cottage({ at: ground(GX, HZ, -0.02), scale: 1.3, k: [0] }, [0.7, 0.78, 0.82], [0.32, 0.38, 0.54]),
     oak((t) => ({ at: ground(...OAK, -0.02), k: [...leaves(t), swingAngle(t)] })),
     box.tree((t) => ({ at: ground(...GTREE, -0.02), scale: 0.95, k: [] }), [[0.2, 0.42, 0.24], [0.34, 0.5, 0.27]]),
     fence((t) => ({ at: ground(GATE[0], GATE[1], -0.01), k: [gateOpen(t), posters(t)] }), 0.65),
     postLamp((t) => ({ at: ground(...LAMP, -0.01), k: [lampOn(t)] })),
     bench({ at: ground(...BENCH, -0.005), turn: -Math.PI / 2 }),
-    box.peg(hero, ...HERO),
-    box.peg(wife, [0.22, 0.5, 0.5], [0.48, 0.26, 0.12], { long: true, legs: [0.3, 0.26, 0.3] }),
-    box.peg(girl, [0.93, 0.72, 0.26], [0.13, 0.09, 0.08], { long: true, legs: [0.36, 0.26, 0.24] }),
+    box.peg(hero, HERO[0], HERO[1], { ...HERO[2], oldCoat: [0.55, 0.19, 0.2] }),
+    box.peg(wife, [0.22, 0.5, 0.5], [0.48, 0.26, 0.12], { long: true, legs: [0.3, 0.26, 0.3], oldCoat: [0.32, 0.42, 0.46] }),
+    box.peg(girl, [0.93, 0.72, 0.26], [0.13, 0.09, 0.08], { long: true, legs: [0.36, 0.26, 0.24], oldCoat: [0.78, 0.58, 0.3] }),
     box.peg(kid, [0.3, 0.46, 0.76], [0.3, 0.2, 0.12]),
     box.dog(theDog),
     box.dog(newPup, [0.15, 0.13, 0.13], [0.95, 0.94, 0.9], [0.09, 0.08, 0.08]),
@@ -459,18 +501,20 @@ const world: BoxWorld = {
       }
       return HIDE;
     }),
-    grave((t) => (t < 6 || t >= 84 ? { at: ground(...GRAVE, -0.01), turn: 0.3 } : HIDE)),
     lantern((t) => (within(t, 40, 45.4) ? { at: box.held(hero(t), [0.03, 0.17, 0.1]), k: [1] } : HIDE)),
   ],
   lamps: (t) => {
     const lit = lampOn(t), carried = within(t, 40, 45.4) ? box.held(hero(t), [0.03, 0.17, 0.1]) : ([0, -40, 0] as V3);
     const lamp = ground(...LAMP, GLASS);
+    const win = (x: number, w: number): { at: V3; color: RGB; power: number; falloff: number; haze: number } => ({ at: [x + 0.22, G(x, HZ) + 0.44, HZ + 0.56], color: [1, 0.7, 0.36], power: 0.45 * w, falloff: 7, haze: 0 });
     return [
-      { at: [lamp[0], lamp[1], lamp[2] + 0.06], color: [1, 0.66, 0.32], power: (within(t, 92, 100) ? 0.7 : 1.25) * lit, falloff: 5, haze: 1.5 },
+      { at: [lamp[0], lamp[1], lamp[2] + 0.05], color: [1, 0.6, 0.26], power: (within(t, 92, 100) ? 0.9 : 1.5) * lit, falloff: 3.2, haze: 1.3 },
       { at: carried, color: [1, 0.6, 0.25], power: within(t, 40, 45.4) ? 1.4 : 0, falloff: 9, haze: 0.9 },
+      win(HX, heroWindow(t)),
+      win(GX, girlWindow(t)),
     ];
   },
-  castBy: 0,
+  castBy: 1,
   sky: (t) => {
     const s = skyNow(t).sky, f = flash(t);
     return f ? { ...s, key: s.key.map((c) => c * (1 + 5 * f)) as V3, fill: s.fill.map((c) => c * (1 + 2.5 * f)) as V3 } : s;
@@ -479,8 +523,10 @@ const world: BoxWorld = {
 };
 // Windows: the houses read their window brightness from k[0].
 const [heroHouse, girlHouse] = world.things;
-heroHouse.pose = (t) => ({ at: ground(HX, HZ, -0.02), scale: 1.3, k: [heroWindow(t)] });
-girlHouse.pose = (t) => ({ at: ground(GX, HZ, -0.02), scale: 1.3, k: [girlWindow(t)] });
+/** The years show on the houses: ivy climbs and the walls weather. */
+const years = (t: number) => (t < 6 ? 1 : smooth(60, 110, t));
+heroHouse.pose = (t) => ({ at: ground(HX, HZ, -0.02), scale: 1.3, k: [heroWindow(t), 0.42 * years(t), 0.75 * years(t)] });
+girlHouse.pose = (t) => ({ at: ground(GX, HZ, -0.02), scale: 1.3, k: [girlWindow(t), 0.3 * years(t), 0.6 * years(t)] });
 
 // ── The camera: shots that move between two framings; a new shot cuts ────────────────────────────────────────────
 
@@ -507,9 +553,9 @@ const SHOTS: Shot[] = [
   { from: 68, to: 72, a: C([0, 0.1, 0], 10, -0.2, 0.45), b: C([0, 0.1, 0], 9.2, 0.2, 0.43) },
   { from: 72, to: 76, a: C([GX, -0.06, 0.06], 2.2, -0.3, 0.34), b: C([GX, -0.06, 0.06], 1.9, -0.22, 0.33) },
   { from: 76, to: 80, a: C([0.26, 0.4, -0.05], 2.6, 0.25, 0.28), b: C([0.26, 0.4, -0.05], 2.4, 0.45, 0.28) },
-  // Its favourite spot, framed as its grave will be.
-  { from: 80, to: 84, a: C([GRAVE[0] - 0.1, 0.12, GRAVE[1]], 2.4, 1.62, 0.36), b: C([GRAVE[0] - 0.1, 0.12, GRAVE[1]], 2.4, 1.62, 0.36) },
-  { from: 84, to: 92, a: C([GRAVE[0] - 0.1, 0.12, GRAVE[1]], 2.4, 1.62, 0.36), b: C([GRAVE[0] - 0.1, 0.1, GRAVE[1]], 2.2, 1.64, 0.34) },
+  // Its favourite spot under her tree, his lamp across the hill.
+  { from: 80, to: 84, a: C([SPOT[0] - 0.25, -0.05, SPOT[1]], 2.3, 1.62, 0.5), b: C([SPOT[0] - 0.25, -0.05, SPOT[1]], 2.3, 1.62, 0.5) },
+  { from: 84, to: 92, a: C([SPOT[0] - 0.25, -0.05, SPOT[1]], 2.3, 1.62, 0.5), b: C([SPOT[0] - 0.25, -0.07, SPOT[1]], 2.1, 1.64, 0.48) },
   { from: 92, to: 100, a: C([BENCH[0] + 0.06, -0.02, BENCH[1] + 0.02], 2.0, 1.1, 0.34), b: C([BENCH[0] + 0.06, -0.02, BENCH[1] + 0.02], 1.85, 1.08, 0.33) },
   { from: 100, to: 103.6, a: C([BENCH[0] + 0.13, -0.04, BENCH[1] + 0.1], 2.1, -0.1, 0.24), b: C([BENCH[0] + 0.13, -0.04, BENCH[1] + 0.1], 1.95, -0.1, 0.23) },
   { from: 103.6, to: 107.4, a: C([LAMP[0] - 0.02, -0.03, LAMP[1] - 0.14], 2.2, 0.22, 0.23), b: C([LAMP[0] - 0.02, -0.03, LAMP[1] - 0.14], 1.9, 0.2, 0.21) },
@@ -589,10 +635,43 @@ function weather(g: CanvasRenderingContext2D, t: number) {
 const BLINKS = [64, 68, 72, 76, 80, 95.6];
 const blink = (t: number) => Math.max(0, ...BLINKS.map((b) => 1 - Math.abs(t - b) / 0.22));
 
+/** Smoke from his chimney on cold days and evenings, and moths round the lamp once it's lit. */
+function life(g: CanvasRenderingContext2D, t: number) {
+  const cam = cameraAt(t), dark = darkness(t), [, , au, wi] = seasonMix(seasonAt(t));
+  const smoke = Math.min(1, wi + 0.6 * au + 0.5 * dark) * (t > 106.3 && t < 115 ? 0 : 1);
+  if (smoke > 0.05) {
+    const top: V3 = [HX + CHIMNEY[0] * 1.3, G(HX, HZ) + CHIMNEY[1] * 1.3, HZ + CHIMNEY[2] * 1.3];
+    for (let i = 0; i < 7; i++) {
+      const a = (t * 0.32 + i / 7) % 1, pos = project(cam, [top[0] + 0.12 * a + 0.03 * Math.sin(t + i), top[1] + 0.55 * a, top[2] - 0.05 * a]);
+      if (!pos) continue;
+      const r = ((0.035 + 0.1 * a) / pos.depth) * 2.2 * W, shade = Math.round(235 - 120 * dark);
+      const grad = g.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, r);
+      grad.addColorStop(0, `rgba(${shade},${shade},${shade + 6},${0.32 * smoke * (1 - a) * Math.min(1, a * 6)})`);
+      grad.addColorStop(1, `rgba(${shade},${shade},${shade + 6},0)`);
+      g.fillStyle = grad;
+      g.fillRect(pos.x - r, pos.y - r, 2 * r, 2 * r);
+    }
+  }
+  const lit = lampOn(t) * smooth(0.45, 0.75, dark);
+  if (lit > 0.05) {
+    const glass = ground(...LAMP, GLASS);
+    for (let i = 0; i < 3; i++) {
+      const pos = project(cam, [glass[0] + 0.07 * Math.cos(t * 4.3 + i * 2.1), glass[1] + 0.03 + 0.035 * Math.sin(t * 6.1 + i), glass[2] + 0.07 * Math.sin(t * 4.3 + i * 2.1)]);
+      if (!pos) continue;
+      const r = Math.max(1.2, (0.006 / pos.depth) * 2.2 * W);
+      g.fillStyle = `rgba(255,236,190,${0.85 * lit})`;
+      g.beginPath();
+      g.arc(pos.x, pos.y, r, 0, TAU);
+      g.fill();
+    }
+  }
+}
+
 const painter = (w: BoxWorld): Painter => {
   const picture = boxLook(w);
   return (g, t) => {
     picture(g, t);
+    life(g, t);
     weather(g, t);
     const b = blink(t);
     if (b > 0) {

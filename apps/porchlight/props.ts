@@ -9,7 +9,7 @@ const thing = (pose: Posed, bound: Thing["bound"], mats: Thing["mats"], sdf: str
 /** The lantern on a post by the gate, its glass at y `GLASS` (0.37). k[0]: how bright 0…1. */
 export const GLASS = 0.37;
 export const postLamp = (pose: Posed) =>
-  thing(pose, { at: [0, 0.2, 0], r: 0.25 }, [{ color: [0.16, 0.13, 0.12] }, { color: [0.62, 0.6, 0.55], glow: [5, 3.3, 1.5], glowBy: 0, glowMix: true }], `
+  thing(pose, { at: [0, 0.2, 0], r: 0.25 }, [{ color: [0.16, 0.13, 0.12] }, { color: [0.62, 0.6, 0.55], glow: [2.7, 1.3, 0.42], glowBy: 0, glowMix: true }], `
  vec3 p=q-vec3(0,.37,0);
  float g=rbox(p,vec3(.026,.036,.026),.008);
  float f=min(rbox(p-vec3(0,.044,0),vec3(.036,.008,.036),.004),rbox(p+vec3(0,.042,0),vec3(.03,.006,.03),.003));
@@ -116,3 +116,42 @@ export const lantern = (pose: Posed) =>
  float g=rbox(q,vec3(.018,.024,.018),.006);
  float f=min(rbox(q-vec3(0,.03,0),vec3(.022,.005,.022),.003),length(vec2(length(q.xy-vec2(0,.04))-.012,q.z))-.002);
  return U(vec2(f,MAT0),vec2(g,MAT1));`);
+
+/** A cottage 1 tall at scale 1, its door and window on +z (laid out like the kit's house): shingles, window panes, a
+ *  chimney, a flower box and a step. k[0]: window light 0…1, k[1]: ivy grown 0…1, k[2]: weathering 0…1.
+ *  The chimney's top is at CHIMNEY in its own space. */
+export const CHIMNEY: [number, number, number] = [0.22, 1.04, -0.12];
+export const cottage = (pose: Posed, wall: RGB, roof: RGB) =>
+  thing(pose, { at: [0, 0.48, 0], r: 0.74 }, [
+    { color: wall, color2: [wall[0] * 0.93, wall[1] * 0.92, wall[2] * 0.9], grain: 9, steps: [{ color: [0.66, 0.62, 0.55], by: 2 }] },
+    { color: roof, color2: [roof[0] * 0.85, roof[1] * 0.82, roof[2] * 0.82], grain: 14, steps: [{ color: [roof[0] * 0.6, roof[1] * 0.6, roof[2] * 0.62], by: 2 }] },
+    { color: [0.42, 0.5, 0.58], glow: [2.2, 1.3, 0.55], glowBy: 0, glowMix: true },
+    { color: [0.42, 0.25, 0.17] },
+    { color: [0.95, 0.93, 0.88] },
+    { color: [0.55, 0.32, 0.26], color2: [0.45, 0.25, 0.2], grain: 30 },
+    { color: [0.5, 0.33, 0.2] },
+    { color: [0.93, 0.42, 0.5] },
+    { color: [0.24, 0.42, 0.22] },
+    { color: [0.2, 0.36, 0.18], color2: [0.3, 0.46, 0.22], grain: 22 },
+    { color: [0.62, 0.6, 0.57] },
+  ], `
+ float b=rbox(q-vec3(0,.28,0),vec3(.4,.34,.32),.02);
+ float ro=max(max(dot(vec2(abs(q.x),q.y-.98),normalize(vec2(.42,.5))),abs(q.z)-.4),.56-q.y);
+ ro-=.007*smoothstep(.25,.85,fract((1.-q.y)*30.));
+ float ch=min(rbox(q-vec3(.22,.86,-.12),vec3(.05,.17,.05),.008),rbox(q-vec3(.22,1.03,-.12),vec3(.062,.012,.062),.004));
+ vec3 w=q-vec3(.17,.34,.32);
+ float fr=max(rbox(w,vec3(.118,.118,.03),.008),-rbox(w-vec3(0,0,.02),vec3(.1,.1,.04),.004));
+ fr=min(fr,min(rbox(w-vec3(0,0,.012),vec3(.1,.008,.012),.002),rbox(w-vec3(0,0,.012),vec3(.008,.1,.012),.002)));
+ float gl=rbox(w,vec3(.1,.1,.012),.002);
+ float bx=rbox(q-vec3(.17,.19,.37),vec3(.12,.022,.04),.006);
+ float fl=1e5,lf=1e5;
+ for(int i=0;i<6;i++){vec3 c=vec3(.075+float(i)*.038,.225,.36+.02*float(i&1));fl=min(fl,length(q-c-vec3(0,.012,0))-.017);lf=min(lf,ell(q-c,vec3(.03,.014,.024)));}
+ float dr=rbox(q-vec3(-.16,.2,.325),vec3(.08,.2,.02),.01);
+ float kn=length(q-vec3(-.105,.2,.35))-.011;
+ float stp=rbox(q-vec3(-.16,.015,.39),vec3(.11,.02,.06),.006);
+ float grow=noise(q*9.)*.45+length(q.xy-vec2(-.42,-.05))*.9;
+ float ivy=k.y>.01?max(b-.012*(.5+.5*noise(q*40.)),grow-k.y*1.3)*.6:1e5;
+ vec2 r=U(vec2(b,MAT0),vec2(ro*.85,MAT1));
+ r=U(r,vec2(gl,MAT2));r=U(r,vec2(dr,MAT3));r=U(r,vec2(min(fr,kn),MAT4));r=U(r,vec2(ch,MAT5));
+ r=U(r,vec2(bx,MAT6));r=U(r,vec2(fl,MAT7));r=U(r,vec2(lf,MAT8));r=U(r,vec2(ivy,MAT9));
+ return U(r,vec2(stp,MAT10));`);

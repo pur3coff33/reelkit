@@ -123,37 +123,59 @@ export const fish = (pose: Posed, color: RGB = [0.85, 0.42, 0.16], belly: RGB = 
  return U(vec2(b*.75,MAT0),vec2(length(vec3(h.x-.17,h.y-.03,abs(h.z)-.052))-.018,MAT1));`);
 
 /** A wooden peg-doll person, 0.5 tall at scale 1, facing +x. k[0]: stride −1…1, k[1]: age 0 child … 1 old (a big head
- *  when young; stooped and grey when old), k[2]: sitting 0…1 (on a seat 0.13 high), k[3]: right arm raised 0…1.
- *  `long` gives hair down the back. Mats: coat, skin, hair, legs, eyes. */
-export const peg = (pose: Posed, coat: RGB, hair: RGB, opts: { legs?: RGB; skin?: RGB; long?: boolean } = {}) =>
+ *  when young; stooped, grey and thinning when old, with glasses and, when standing, a cane), k[2]: sitting 0…1 (on a
+ *  seat 0.13 high), k[3]: right arm raised 0…1. The face (k[4]…k[6], use pegK): smile −1 sad … 1, eyes closed 0…1,
+ *  head turned −1 right … 1 left. `long` gives hair down the back; `oldCoat` is what the coat fades to with age.
+ *  Mats: coat, skin, hair, legs, ink (eyes, brows, mouth, glasses), cheeks, shoes and cane. */
+export const peg = (pose: Posed, coat: RGB, hair: RGB, opts: { legs?: RGB; skin?: RGB; long?: boolean; oldCoat?: RGB } = {}) =>
   thing(pose, { at: [0.04, 0.27, 0], r: 0.37 }, [
-    { color: coat },
-    { color: opts.skin ?? [0.86, 0.66, 0.5] },
-    { color: hair, steps: [{ color: [0.8, 0.79, 0.77], by: 1, from: 0.7, to: 0.95 }] },
+    { color: coat, steps: opts.oldCoat ? [{ color: opts.oldCoat, by: 1, from: 0.45, to: 0.9 }] : [] },
+    { color: opts.skin ?? [0.88, 0.68, 0.52] },
+    { color: hair, steps: [{ color: [0.86, 0.85, 0.83], by: 1, from: 0.68, to: 0.92 }] },
     { color: opts.legs ?? [0.22, 0.2, 0.26] },
-    { color: [0.05, 0.04, 0.05] },
+    { color: [0.07, 0.05, 0.06] },
+    { color: [0.94, 0.5, 0.48] },
+    { color: [0.3, 0.19, 0.13] },
   ], `
- float age=k.y,sit=k.z,st=smoothstep(.65,1.,age)*.07,s=k.x*.075*(1.-sit);
+ float age=k.y,sit=k.z,st=smoothstep(.65,1.,age)*.07,s=k.x*.075*(1.-sit),smile=k2.x,shut=k2.y,old=smoothstep(.84,.92,age);
  vec3 h=q-vec3(0,.012*abs(k.x)*(1.-sit),0);
- float hip=mix(.2,.135,sit),lg=1e5;
+ float hip=mix(.2,.135,sit),lg=1e5,sh2=1e5;
  for(int i=0;i<2;i++){float sd=i==0?-1.:1.,sw=s*sd;
-  vec3 a=vec3(0,hip,.04*sd),kn=mix(vec3(sw*.5,.11,.04*sd),vec3(.12,.14,.045*sd),sit),f=mix(vec3(sw,.025,.04*sd),vec3(.13,.025,.05*sd),sit);
-  lg=min(lg,min(cap(h,a,kn,.036,.032),cap(h,kn,f,.032,.03)));}
+  vec3 a=vec3(0,hip,.04*sd),kn=mix(vec3(sw*.5,.11,.04*sd),vec3(.12,.14,.045*sd),sit),f=mix(vec3(sw,.03,.04*sd),vec3(.13,.03,.05*sd),sit);
+  lg=min(lg,min(cap(h,a,kn,.036,.032),cap(h,kn,f,.032,.03)));
+  sh2=min(sh2,ell(h-f-vec3(.016,-.012,0),vec3(.04,.02,.027)));}
  vec3 top=vec3(st,.37-st*.4,0);
  float b=cap(h,vec3(0,hip+.01,0),top,.078,.064);
  b=smin(b,ell(h-vec3(0,hip+.02,0),vec3(.085,.06,.08)),.03);
- vec3 sh=top-vec3(0,.02,0),hand=mix(sh+vec3(s*.6+.02,-.15+.03*sit,-.085),sh+vec3(.1,.17,-.06),k.w);
- float ar=min(cap(h,sh+vec3(0,0,.07),sh+vec3(-s*.6+.02,-.15+.03*sit,.085),.026,.022),cap(h,sh+vec3(0,0,-.07),hand,.026,.022));
+ vec3 sh=top-vec3(0,.02,0),hand=mix(sh+vec3(s*.6+.02,-.15+.03*sit,-.085),sh+vec3(.1,.17,-.06),k.w),left=sh+vec3(-s*.6+.02,-.15+.03*sit,.085);
+ float ar=min(cap(h,sh+vec3(0,0,.07),left,.026,.022),cap(h,sh+vec3(0,0,-.07),hand,.026,.022));
  b=smin(b,ar,.02);
+ float cane=old*(1.-sit)>.5?cap(h,left+vec3(.02,0,.012),vec3(left.x+.05,0.,left.z+.02),.007,.007):1e5;
  float hr=mix(.085,.064,smoothstep(0.,.45,age));
  vec3 hc=top+vec3(st*.6+.005,.035+hr,0),hq=h-hc;
+ hq.xz=rot(-k2.z*.6)*hq.xz;
  float hd=length(hq)-hr;
+ hd=smin(hd,length(hq-vec3(hr*.98,-.008,0))-.009,.006);
+ vec3 ez=vec3(hq.x,hq.y,abs(hq.z));
+ hd=min(hd,length(ez-vec3(-.004,-.006,hr*.97))-.014);
  float hair=max(length(hq-vec3(-.012,.012,0))-hr*1.07,-(hq.y-.5*hq.x+.03));
- ${opts.long ? "hair=smin(hair,cap(hq,vec3(-.045,0,0),vec3(-.05,-.1,0),.05,.042),.02);" : ""}
- float ey=length(vec3(hq.x-hr*.9,hq.y-.008,abs(hq.z)-.026))-.0085;
+ hair=smin(hair,length(hq-vec3(.03,hr*.8,.012))-hr*.32,.02);
+ ${opts.long ? "hair=smin(hair,cap(hq,vec3(-.045,0,0),vec3(-.05,-.1,0),.05,.042),.02);hair=old>.5?smin(hair,length(hq-vec3(-.06,.045,0))-.03,.01):hair;" : "hair=max(hair,max(hq.y-.03+.35*hq.x,hq.y-.006+.15*hq.x)-(1.-old));"}
+ float eye=ell(ez-vec3(hr*.9,.008,.026),vec3(.0085,.0085*(1.-.85*shut)+.0012,.0085));
+ vec3 bw=ez-vec3(sqrt(max(hr*hr-.0017,0.))-.0005,.031+.004*smile,.026);
+ float brow=cap(bw,vec3(0,-.003*smile-.006*min(smile,0.),-.011),vec3(0,.003*smile,.011),.003,.003);
+ vec3 mq=hq-vec3(0,-.03,0);float mz=clamp(mq.z,-.017,.017);
+ float mouth=length(mq-vec3(sqrt(max(hr*hr-.0009-mz*mz,0.))-.0012,smile*(mz*mz*38.-.004),mz))-.003;
+ float glass=old>.5?min(length(vec2(length(ez.yz-vec2(.008,.026))-.018,ez.x-hr*1.02))-.0022,cap(hq,vec3(hr*1.02,.012,-.01),vec3(hr*1.02,.012,.01),.002,.002)):1e5;
+ float ink=min(min(eye,brow),min(mouth,glass));
+ float cheek=max(hd-.0014,length(ez-vec3(hr*.8,-.016,hr*.56))-.013);
  vec2 r=U(vec2(b,MAT0),vec2(lg,MAT3));
- r=U(r,vec2(hd,MAT1));r=U(r,vec2(hair,MAT2));
- return U(r,vec2(ey,MAT4));`);
+ r=U(r,vec2(hd,MAT1));r=U(r,vec2(hair,MAT2));r=U(r,vec2(cheek,MAT5));
+ r=U(r,vec2(min(sh2,cane),MAT6));
+ return U(r,vec2(ink,MAT4));`);
+
+/** Packs a person's pose numbers: the body's four, then the face's. */
+export const pegK = (stride: number, age: number, sit = 0, arm = 0, face: { smile?: number; shut?: number; look?: number } = {}) => [stride, age, sit, arm, face.smile ?? 0.3, face.shut ?? 0, face.look ?? 0];
 
 /** Packs a dog's pose numbers. */
 export const dogK = (legs: number, tail: number, age: number, lie = 0, bandana = false) => [legs, tail, age, lie + (bandana ? 2 : 0)];

@@ -1,7 +1,7 @@
 // The score. One theme that always stops one note short of home: it breaks off on E until he has switched the light off
 // and gone in, and only then lands on D. The lamp has its own two harp notes (A up to D), heard each time it comes on, and
 // played backwards when he switches it off. Each chapter has its own colour: piano (night), pizzicato and marimba (the
-// puppy, the sheet), trembling cellos (the storm), solo violin (the calling), everything (the years), cello (the grave).
+// puppy, the sheet), trembling cellos (the storm), solo violin (the calling), everything (the years), cello (the old dog hearing the light).
 import { instrument, type Instrument } from "../../src/kit/music/sampler";
 import { Session, above, loudnessOf, parseChord, seeded, voice, type Stem } from "../../src/kit/music/studio";
 import { SR, svf, writeWav } from "../../src/kit/music/synth";
@@ -28,7 +28,7 @@ const PADS: [number, number, string, number, string][] = [
   [52, 1.5, "Em9", 0.25, "b"], [53.5, 1.5, "A9sus4", 0.35, "b"], [55, 2.5, "Dadd9", 0.6, "hbv"], [57.5, 2.5, "Gmaj9", 0.65, "hbv"],
   // The years, a day to a bar.
   [60, 4, "Dadd9", 0.55, "hb"], [64, 4, "Gmaj9", 0.65, "hbv"], [68, 4, "Bm9", 0.35, "b"], [72, 4, "Gmaj9", 0.75, "hbv"], [76, 4, "Dmaj9/F#", 0.9, "hbv"], [80, 4, "A9sus4", 0.6, "hb"],
-  // The grave.
+  // Her old dog, at dusk.
   [84, 4, "Bm9", 0.28, "b"], [88, 4, "Gmaj9", 0.32, "b"],
   // Old together; then alone.
   [92, 3.6, "Gmaj9", 0.4, "b"], [95.6, 4.4, "Bm9", 0.18, ""],
@@ -178,7 +178,7 @@ export async function writeMusic(file: string) {
   for (let k = 0; k < 16; k++) mallet.note(marimba, ["D5", "F#5", "A5", "F#5", "G5", "B5", "A5", "F#5"][k % 8], 76 + k * 0.25, 0.4, 0.28, { attack: 0.002, release: 0.5, pan: 0.25 });
   onPiano(SECOND, 80.3, 0.45, 0.32);
 
-  // 1:24 The grave: the cello has the theme.
+  // 1:24 Her old dog lifts its head to his light: the cello has the theme.
   onCello(FIRST, 84.8, 0.85, 0.42);
   // 1:32 Old, two of them; then one.
   onPiano(OPENING, 92.4, 0.55, 0.3);

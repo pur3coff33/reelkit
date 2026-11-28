@@ -2,7 +2,7 @@
 // length so the reel can time scenes and captions to it. The model is downloaded once and cached.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { ReelConfig } from "../config";
 import { ensureOut } from "../paths";
 
@@ -60,13 +60,14 @@ function voiceTable(name: string) {
   return new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 }
 
-/** Renders every line. `voiceName` overrides the config's voice (e.g. its `compare` one) into out/voice-<name>/. */
-export async function voice(config: ReelConfig, voiceName?: string) {
+/** Renders every line. `voiceName` overrides the config's voice (e.g. its `compare` one) into out/voice-<name>/. `under`
+ *  puts the folder (and its .json) inside out/<under>/, for films made in parts (apps/ozone/parts). */
+export async function voice(config: ReelConfig, voiceName?: string, under?: string) {
   const { KokoroTTS } = await import("kokoro-js");
   const clash = clashingIds(config.voice.lines.map((l) => l.id));
   if (clash.length) throw new Error(`voice line ids ${clash.join(", ")} clash with others that differ only in case: their WAVs would overwrite each other`);
   const name = voiceName || config.voice.name;
-  const folder = name === config.voice.name ? "voice" : `voice-${voiceSlug(name)}`;
+  const folder = (under ? `${under}/` : "") + (name === config.voice.name ? "voice" : `voice-${voiceSlug(name)}`);
   const parts = parseVoice(name);
   const dir = ensureOut(config.app, folder);
   console.log(`  loading Kokoro (${MODEL}), voice ${name}`);
@@ -76,15 +77,19 @@ export async function voice(config: ReelConfig, voiceName?: string) {
   if (parts.length > 1) await useBlend(tts, parts);
   const manifest: VoiceManifest = { voice: name, lines: [] };
   for (const line of config.voice.lines) {
-    // A blend reads with the first voice's accent (en-us for a…, en-gb for b…).
-    const audio = await tts.generate(line.text, { voice: parts[0].name as never, speed: line.speed ?? config.voice.speed });
+    // A blend reads with the first voice's accent (en-us for a…, en-gb for b…). A line with [word](/ipa/) in it is
+    // turned into phonemes here, so those words are read as written; any other line goes through kokoro-js unchanged.
+    const opts = { voice: parts[0].name as never, speed: line.speed ?? config.voice.speed };
+    const audio = hasIpa(line.text)
+      ? await tts.generate_from_ids(tts.tokenizer(await phonemesOf(line.text, parts[0].name[0] === "a" ? "en-us" : "en"), { truncation: true }).input_ids, opts)
+      : await tts.generate(line.text, opts);
     const file = join(dir, `${line.id}.wav`);
     await audio.save(file);
     const seconds = trimmedLength(audio.audio, audio.sampling_rate);
     manifest.lines.push({ id: line.id, caption: line.caption, beat: line.beat, file: `out/${folder}/${line.id}.wav`, seconds, lead: speechStart(audio.audio, audio.sampling_rate) });
     console.log(`  ${line.id}: ${seconds.toFixed(2)}s${line.speed ? ` @${line.speed}` : ""}  "${line.text}"`);
   }
-  writeFileSync(join(dir, "..", `${folder}.json`), JSON.stringify(manifest, null, 2));
+  writeFileSync(join(dir, "..", `${basename(folder)}.json`), JSON.stringify(manifest, null, 2));
   if (!voiceName && config.voice.compare) console.log(`  (compare with: npm run voice -- ${config.app} --voice ${config.voice.compare})`);
 }
 
@@ -101,6 +106,55 @@ async function useBlend(tts: { model: unknown; generate_from_ids: unknown }, par
     return new RawAudio(waveform.data, 24000);
   };
   console.log(`  blend: ${parts.map((p) => `${p.name} ${Math.round(p.weight * 100)}%`).join(" + ")}`);
+}
+
+// ── Pronunciations ────────────────────────────────────────────────────────────────────────────────────
+
+/** `[Timog](/tiˈmoɡ/)`: a word read from the phonemes given (Kokoro's IPA, as `apps/ozone/say.ts` prints it). */
+const IPA = /\[([^\]]+)\]\(\/([^/]+)\/\)/g;
+export const hasIpa = (text: string) => /\[[^\]]+\]\(\/[^/]+\/\)/.test(text);
+/** The text as plain runs and given pronunciations, in order. */
+export function splitIpa(text: string): ({ text: string } | { ipa: string })[] {
+  const out: ({ text: string } | { ipa: string })[] = [];
+  let at = 0;
+  for (const m of text.matchAll(IPA)) {
+    if (m.index > at) out.push({ text: text.slice(at, m.index) });
+    out.push({ ipa: m[2] });
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out;
+}
+
+const PUNCT = ';:,.!?¡¿—…"«»“”(){}[]';
+const PUNCT_RUN = new RegExp(`(\\s*[${PUNCT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}]+\\s*)+`, "g");
+
+/** Phonemes for a line, as kokoro-js makes them (punctuation kept, espeak for the words, the same clean-up after), with any
+ *  [word](/ipa/) taken as given. Only for lines without numbers or abbreviations: kokoro-js's own text clean-up is skipped. */
+export async function phonemesOf(text: string, lang: "en" | "en-us") {
+  const { phonemize } = await import("phonemizer");
+  const plain = async (t: string) => {
+    let out = "", at = 0;
+    for (const m of t.matchAll(PUNCT_RUN)) {
+      if (m.index > at) out += (await phonemize(t.slice(at, m.index), lang)).join(" ");
+      out += m[0];
+      at = m.index + m[0].length;
+    }
+    if (at < t.length) out += (await phonemize(t.slice(at), lang)).join(" ");
+    return out;
+  };
+  let s = "";
+  for (const part of splitIpa(text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"'))) {
+    if ("ipa" in part) s += part.ipa;
+    else {
+      const lead = /^\s/.test(part.text) ? " " : "", tail = /\s$/.test(part.text) ? " " : "";
+      const body = part.text.trim() ? await plain(part.text.trim()) : "";
+      s += (body ? lead + body + tail : lead || tail);
+    }
+  }
+  s = s.replace(/ʲ/g, "j").replace(/r/g, "ɹ").replace(/x/g, "k").replace(/ɬ/g, "l").replace(/ z(?=[;:,.!?¡¿—…"«»“” ]|$)/g, "z").replace(/  +/g, " ");
+  if (lang === "en-us") s = s.replace(/(?<=nˈaɪn)ti(?!ː)/g, "di");
+  return s.trim();
 }
 
 /** Seconds until the speech really ends (Kokoro leaves a little silence at the end). */

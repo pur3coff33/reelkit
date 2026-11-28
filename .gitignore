@@ -8,3 +8,9 @@ docs/superpowers/
 
 # secrets (ElevenLabs key)
 .env
+
+# Ozone film: agency photos (AP/AFP, used under fair use in the finished film) and photos of people
+# with unrecorded licences stay local. The film renders from them; the repo doesn't redistribute them.
+apps/ozone/assets/ap-*.jpg
+apps/ozone/assets/afp-*.jpg
+apps/ozone/assets/people/

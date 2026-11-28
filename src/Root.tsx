@@ -56,8 +56,11 @@ import { config as looks } from "../apps/looks/reel.config";
 import { LookFilm, loadLookFonts } from "./kit/looks/Film";
 import { STILLS as STRANGERS_STILLS, StrangersReel, loadStrangers } from "../apps/strangers/Reel";
 import { config as strangers } from "../apps/strangers/reel.config";
-import { COMPARE as PORCHLIGHT_COMPARE, FILM as PORCHLIGHT, PREVIEW as PORCHLIGHT_PREVIEW, STILLS as PORCHLIGHT_STILLS } from "../apps/porchlight/Reel";
+import { COMPARE as PORCHLIGHT_COMPARE, FILM as PORCHLIGHT, LOWPOLY as PORCHLIGHT_LOWPOLY, LOWPOLY_STILLS as PORCHLIGHT_LP_STILLS, PREVIEW as PORCHLIGHT_PREVIEW, STILLS as PORCHLIGHT_STILLS } from "../apps/porchlight/Reel";
 import { config as porchlight } from "../apps/porchlight/reel.config";
+import { FILM as PASKO, STILLS as PASKO_STILLS } from "../apps/pasko/Reel";
+import { config as pasko } from "../apps/pasko/reel.config";
+import { STYLE_FRAMES as PASKO_STYLE_FRAMES, stylePaint as paskoStyles } from "../apps/pasko/styles";
 import { CosmicEggReel, STILLS as EGG_STILLS } from "../apps/cosmic-egg/Reel";
 import { config as cosmicEgg } from "../apps/cosmic-egg/reel.config";
 import { MOCKS as EGG_MOCKS, MOCK_STILLS as EGG_MOCK_STILLS } from "../apps/cosmic-egg/mocks";
@@ -65,6 +68,15 @@ import { MIX as EGG_MIX, MIX_STILLS as EGG_MIX_STILLS } from "../apps/cosmic-egg
 import { config as saf44 } from "../apps/saf44/reel.config";
 import { MOCK_STILLS as MIDDLE_MOCKS, MiddleReel, REVIEW_STILLS as MIDDLE_REVIEW, STILLS as MIDDLE_STILLS, loadMiddle } from "../apps/middle/Reel";
 import { config as middle } from "../apps/middle/reel.config";
+import { MOCK_STILLS as UNDER_MOCKS, REVIEW_STILLS as UNDER_REVIEW, STILLS as UNDER_STILLS, UnderneathReel, loadUnderneath } from "../apps/underneath/Reel";
+import { config as underneath } from "../apps/underneath/reel.config";
+import { LOOK_AT as PINATUBO_LOOK, PinatuboReel, loadPinatubo } from "../apps/pinatubo/Reel";
+import { config as pinatubo } from "../apps/pinatubo/reel.config";
+import { FILMS as OZONE_FILMS } from "../apps/ozone/films";
+import { BOARDS as OZONE_BOARDS, OzoneBoards, loadOzone } from "../apps/ozone/Mock";
+import { PartFilm as OzonePart } from "../apps/ozone/PartFilm";
+import { ORDER as OZONE_PARTS } from "../apps/ozone/parts";
+import { config as ozone } from "../apps/ozone/reel.config";
 
 // The disaster sims are drawn from code alone: no props, no pipeline JSON (only out/music.wav).
 const SIMS = [
@@ -293,14 +305,32 @@ export function Root() {
       <Composition id="cosmic-egg-contact" component={CosmicEggReel} width={cosmicEgg.width} height={cosmicEgg.height} fps={cosmicEgg.fps} durationInFrames={EGG_STILLS.length} defaultProps={{ at: EGG_STILLS }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       <Composition id="cosmic-egg-mocks" component={(p: { at?: number[] }) => <LookFilm film={EGG_MOCKS} {...p} />} width={1080} height={1920} fps={30} durationInFrames={EGG_MOCK_STILLS.length} defaultProps={{ at: EGG_MOCK_STILLS }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       <Composition id="cosmic-egg-mix" component={(p: { at?: number[] }) => <LookFilm film={EGG_MIX} {...p} />} width={1080} height={1920} fps={30} durationInFrames={EGG_MIX_STILLS.length} defaultProps={{ at: EGG_MIX_STILLS }} calculateMetadata={async () => (await loadLookFonts(), {})} />
+      {/* Pinatubo, 1991: the first documentary (src/kit/doc). The look renders one still per shot, for review. */}
+      <Composition id="pinatubo" component={PinatuboReel} width={pinatubo.width} height={pinatubo.height} fps={pinatubo.fps} durationInFrames={pinatubo.seconds * pinatubo.fps} defaultProps={{ media: {} }} calculateMetadata={async () => ({ props: await loadPinatubo() })} />
+      <Composition id="pinatubo-look" component={PinatuboReel} width={pinatubo.width} height={pinatubo.height} fps={pinatubo.fps} durationInFrames={PINATUBO_LOOK.length} defaultProps={{ media: {}, at: PINATUBO_LOOK }} calculateMetadata={async ({ props }) => ({ props: { ...props, ...(await loadPinatubo()) } })} />
+      {/* Ozone, 1996 (long-form documentary, made in parts: apps/ozone/parts.ts). Boards: one still per look. */}
+      <Composition id="ozone-boards" component={OzoneBoards} width={ozone.width} height={ozone.height} fps={ozone.fps} durationInFrames={OZONE_BOARDS.length} calculateMetadata={async () => ({ props: await loadOzone() })} />
+      {OZONE_PARTS.map((id) => (
+        <Composition key={id} id={`ozone-part-${id}`} component={OzonePart} width={ozone.width} height={ozone.height} fps={ozone.fps} durationInFrames={Math.ceil(OZONE_FILMS[id].layout.seconds * ozone.fps)} defaultProps={{ id }} calculateMetadata={async () => ({ props: { ...(await loadOzone()), id } })} />
+      ))}
       <Composition id="middle" component={MiddleReel} width={middle.width} height={middle.height} fps={middle.fps} durationInFrames={middle.seconds * middle.fps} defaultProps={{ step: 1 }} calculateMetadata={async () => ({ props: { spoken: await loadMiddle() } })} />
       <Composition id="middle-contact" component={MiddleReel} width={middle.width} height={middle.height} fps={middle.fps} durationInFrames={MIDDLE_STILLS.length} defaultProps={{ at: MIDDLE_STILLS }} calculateMetadata={async ({ props }) => ({ props: { ...props, spoken: await loadMiddle() } })} />
       <Composition id="middle-review" component={MiddleReel} width={middle.width} height={middle.height} fps={middle.fps} durationInFrames={MIDDLE_REVIEW.length} defaultProps={{ at: MIDDLE_REVIEW }} calculateMetadata={async ({ props }) => ({ props: { ...props, spoken: await loadMiddle() } })} />
       <Composition id="middle-mocks" component={MiddleReel} width={middle.width} height={middle.height} fps={middle.fps} durationInFrames={MIDDLE_MOCKS.length} defaultProps={{ at: MIDDLE_MOCKS }} calculateMetadata={async ({ props }) => ({ props: { ...props, spoken: await loadMiddle() } })} />
+      {/* The Forest Underneath: the fungal network in points of light (apps/underneath). Mocks: one still mid-scene. */}
+      <Composition id="underneath" component={UnderneathReel} width={underneath.width} height={underneath.height} fps={underneath.fps} durationInFrames={Math.ceil(underneath.seconds * underneath.fps)} defaultProps={{ step: 1 }} calculateMetadata={async () => ({ props: { spoken: await loadUnderneath() } })} />
+      <Composition id="underneath-contact" component={UnderneathReel} width={underneath.width} height={underneath.height} fps={underneath.fps} durationInFrames={UNDER_STILLS.length} defaultProps={{ at: UNDER_STILLS }} calculateMetadata={async ({ props }) => ({ props: { ...props, spoken: await loadUnderneath() } })} />
+      <Composition id="underneath-review" component={UnderneathReel} width={underneath.width} height={underneath.height} fps={underneath.fps} durationInFrames={UNDER_REVIEW.length} defaultProps={{ at: UNDER_REVIEW }} calculateMetadata={async ({ props }) => ({ props: { ...props, spoken: await loadUnderneath() } })} />
+      <Composition id="underneath-mocks" component={UnderneathReel} width={underneath.width} height={underneath.height} fps={underneath.fps} durationInFrames={UNDER_MOCKS.length} defaultProps={{ at: UNDER_MOCKS }} calculateMetadata={async ({ props }) => ({ props: { ...props, spoken: await loadUnderneath() } })} />
       <Composition id="porchlight" component={(p: { step?: number; at?: number[] }) => <LookFilm film={PORCHLIGHT} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={porchlight.seconds * porchlight.fps} defaultProps={{ step: 1 }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       <Composition id="porchlight-preview" component={(p: { step?: number }) => <LookFilm film={PORCHLIGHT_PREVIEW} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={porchlight.seconds * 4} defaultProps={{ step: 7.5 }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       <Composition id="porchlight-compare" component={(p: { at?: number[] }) => <LookFilm film={PORCHLIGHT} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={PORCHLIGHT_COMPARE.length} defaultProps={{ at: PORCHLIGHT_COMPARE }} calculateMetadata={async () => (await loadLookFonts(), {})} />
+      <Composition id="porchlight-lowpoly" component={(p: { step?: number; at?: number[] }) => <LookFilm film={PORCHLIGHT_LOWPOLY} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={porchlight.seconds * porchlight.fps} defaultProps={{ step: 1 }} calculateMetadata={async () => (await loadLookFonts(), {})} />
+      <Composition id="porchlight-lowpoly-stills" component={(p: { at?: number[] }) => <LookFilm film={PORCHLIGHT_LOWPOLY} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={PORCHLIGHT_LP_STILLS.length} defaultProps={{ at: PORCHLIGHT_LP_STILLS }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       <Composition id="porchlight-stills" component={(p: { step?: number; at?: number[] }) => <LookFilm film={PORCHLIGHT} {...p} />} width={porchlight.width} height={porchlight.height} fps={porchlight.fps} durationInFrames={PORCHLIGHT_STILLS.length} defaultProps={{ at: PORCHLIGHT_STILLS }} calculateMetadata={async () => (await loadLookFonts(), {})} />
+      <Composition id="pasko" component={(p: { step?: number; at?: number[] }) => <LookFilm film={PASKO} {...p} />} width={pasko.width} height={pasko.height} fps={pasko.fps} durationInFrames={pasko.seconds * pasko.fps} defaultProps={{ step: 1 }} calculateMetadata={async () => (await loadLookFonts(), {})} />
+      <Composition id="pasko-styles" component={(p: { at?: number[] }) => <LookFilm film={{ seconds: 8, scenes: [{ from: 0, to: 8, paint: paskoStyles }], lines: [] }} {...p} />} width={pasko.width} height={pasko.height} fps={pasko.fps} durationInFrames={PASKO_STYLE_FRAMES.length} defaultProps={{ at: PASKO_STYLE_FRAMES }} calculateMetadata={async () => (await loadLookFonts(), {})} />
+      <Composition id="pasko-stills" component={(p: { at?: number[] }) => <LookFilm film={{ ...PASKO, music: false }} {...p} />} width={pasko.width} height={pasko.height} fps={pasko.fps} durationInFrames={PASKO_STILLS.length} defaultProps={{ at: PASKO_STILLS }} calculateMetadata={async () => (await loadLookFonts(), {})} />
       {/* Paper, box and dots: the demo film of each, a contact sheet of it, and the parts each look has. */}
       {LOOKS.flatMap(({ id, film, stills }) => {
         const size = { width: looks.width, height: looks.height, fps: looks.fps, calculateMetadata: async () => (await loadLookFonts(), {}) };

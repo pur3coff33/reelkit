@@ -14,10 +14,11 @@ Each step is `npm run <step> -- <app>` and writes into `apps/<app>/out/` (gitign
 | `voice` | Kokoro (kokoro-js, CPU) reads `config.voice.lines`, one WAV per line | `out/voice/*.wav`, `out/voice.json` |
 | `music` | Runs the app's `music` hook (generated tracks) | `out/music.wav` |
 | `beats` | Beat grid from `config.music.bpm/offset`, or detected from the track | `out/beats.json` |
-| `render` | Remotion renders the app's composition (app folder = public dir) | `out/<app>-9x16-raw.mp4` |
-| `export` | Trims to length, −14 LUFS + limiter; `--extras` adds 1:1, 4:5, GIF | `out/<app>-9x16.mp4` |
+| `render` | Remotion renders the app's composition (app folder = public dir) | `out/<app>-<shape>-raw.mp4` (`9x16`, `16x9`…) |
+| `export` | Trims to length, −14 LUFS + limiter; `--extras` adds 1:1, 4:5, GIF (portrait only) | `out/<app>-<shape>.mp4` |
 | `reel` | capture → voice → music → beats → render → export | |
 | `studio` | Remotion Studio on the app's composition, for tweaking timing live | |
+| `fetch` | Documentaries: downloads `media.ts` (photos, footage, music), checks rights | `out/media/`, `out/media.json`, `out/credits.md` |
 
 Flags: `capture --peek` (screenshot + HTML per shot instead of recording: use it to find selectors), `capture --only <shot>`,
 `voice --voice <name>` (renders another voice into `out/voice-<name>/` to compare).
@@ -25,6 +26,19 @@ Flags: `capture --peek` (screenshot + HTML per shot instead of recording: use it
 Kokoro has no emotion setting. To change the delivery, use the voice, the speed, and punctuation (`!`, `?`, `…`, `—`). A
 voice `name` can be a blend: `"af_heart:0.7,af_bella:0.3"` (a blend reads with the first voice's accent; `--voice`
 takes blends too). A line can set its own `speed`, which overrides `voice.speed`.
+
+Names espeak gets wrong (Filipino names, places) can be given as phonemes inside a line's `text`: `[Timog](/timˈoɡ/)`.
+The rest of the line is phonemised exactly as kokoro-js does it (checked identical on 14 lines), so only the marked word
+changes. Find the phonemes with `npx tsx apps/ozone/say.ts "Timog" "Tee-mog"` (prints what Kokoro will read for each
+spelling); every symbol in Kokoro's vocabulary works (ɾ, ɔ, ʎ…). Skip markup in lines with digits or abbreviations: that
+path skips kokoro-js's own text clean-up.
+
+## Video length is a guide, not a target
+
+When the user asks for "a 1 min video" (or any length), it's approximate: a bit shorter or longer is fine (±20% without
+asking). Never cut sourced detail, speed up the voice, squeeze the pauses or shorten shots just to land on an exact
+number (the user, 2026-11-27, after the Pinatubo narration was rushed to hit 59.96 s). Let the layout set the length:
+derive the composition's duration from it (`seconds: Math.ceil(LAYOUT.seconds)` in `apps/pinatubo/reel.config.ts`).
 
 ## Post notes with every video (don't skip)
 
@@ -61,7 +75,8 @@ Measured on callmask (62 s, 1080×1920, flat graphics, mono 96k voice). Similari
 | **CRF 24** (recommended) | **3.1 MB** | 0.9985 |
 | CRF 26 | 2.7 MB | 0.9980 |
 
-Not wired into `export` yet: it still copies the render's video and writes 256k stereo audio.
+Wired into `export` only for apps with `encode: "doc"` (CRF 24, `-tune film`, AAC 192k); the rest still copy the
+render's video and write 256k stereo audio.
 
 **Points-of-light films are a different case: pick the size, not just the CRF.** Tens of thousands of moving dots are
 about the hardest thing to compress: the same CRF gives 5–10× the bitrate of flat graphics, and calm scenes are no
@@ -250,6 +265,77 @@ review: `npx remotion render src/index.ts looks-<paper|box|dots|mix>-contact <di
   → music → render → mux by hand at CRF 29 → copy `post.md`. It loops (`loop.test.ts`). Review stills: `middle-review`.
 - **Narrated dots film:** `apps/strangers` ("Made of Strangers", 2:00, one crowd of points through 12 shapes). Its
   `music.ts` bakes the voice, score and ducking into `music.wav`: run voice → music → render, then mux by hand as for the whale.
+
+- **`underneath`** ("The Forest Underneath", ~2:03, 11 scenes, fungal networks): built on `middle`'s structure, with
+  `shapes/grow.ts` (branching twigs with growth timing: threads, roots, trees, arbuscules). The length comes from the
+  voice (`LAYOUT.total`, at least 120 s). voice → `npx tsx apps/underneath/layout.ts` → music → render → mux by hand →
+  copy `post.md`. Mocks: `underneath-mocks`; merges: `underneath-review`. Kokoro says "fungi" as "fung-ee": lines mark
+  it `[fungi](/fˈʌŋɡaɪ/)`.
+
+## Documentaries (`src/kit/doc`, first film `apps/pinatubo`)
+
+Research first, LEMMiNO-style: real photos and footage, quiet graphics (maps and diagrams) for what no camera
+caught, Kokoro narration, captions. Landscape works: file names follow the frame (`pinatubo-16x9.mp4`).
+
+**The method (story angles first, picture treatments, voice, cue sheets, common mistakes) is the `reel-documentary`
+skill (`.claude/skills/reel-documentary/SKILL.md`): follow it for every documentary.** Below are the kit details.
+
+Pipeline: research → `facts.ts` → `script.ts` → `media.ts` → `npm run fetch -- <app>` → `voice` →
+`npx tsx apps/<app>/layout.ts` → `music` → `render` → `export` (`encode: "doc"` re-encodes at CRF 24, `-tune film`).
+Review with `<app>-look` (one still per shot).
+
+- **Facts** (`facts.ts` in the kit): every voice line and on-screen text names fact ids; every fact names a source.
+  The app's test runs `checkFacts` and checks every number in a caption is in its facts. Captions carry digits,
+  voice `text` spells them.
+- **Media** (`media.ts`): each item has its licence, credit and `rights: "free" | "fair-use"`. Fair use needs a reason;
+  fair-use video ≤ 5 s and muted; fair-use audio is refused. `fetch` resolves Commons file pages through the API,
+  trusts the URL's extension when a server says `octet-stream`, refuses HTML, retries 429s, skips files it already has,
+  and writes `out/media.json` and `out/credits.md`. Look at every picture before using it (tile a contact sheet).
+  Wikimedia rate-limits bursts hard (one 429 asked for 600 s).
+- **Components**: `Still` (slow push-in, archival grade), `Print` (photos too small to fill 1080p, ≤ 2×), `Clip`
+  (plays the media entry's `use`; DocFilm puts every shot in its own Sequence), `MapCard` (pins, evacuation circles in
+  km, a drawn track with a moving typhoon `storm` mark, a spreading ash `plume`; pass finer `rings` for a close view),
+  `HeightChart` (to-scale altitude: the mountain a sliver, a column rising past marked heights, a counter), `DateLine`,
+  `DocCaptions`, `Title` (with a `note`: "Sources in the description"), `DocFilm`. Call `loadDocFonts()` inside the
+  component (DocFilm does): fonts loaded in calculateMetadata don't reach render tabs. In `-look` stills each shot is
+  `Freeze`d at its own moment (a Sequence would never reach it in a 15-frame composition).
+- **No low-poly in documentaries.** The user found the low-poly reconstructions "too cartoonish" for this kind of
+  video. Show what no camera caught with doc graphics instead (maps, diagrams, treated real photos).
+- **Timing** (`timing.ts`): a film is beats (lines told over shots); `layOut` stretches shots to the voice, catches
+  broken beats, and fails past a generous ceiling (length is a guide: see above). `staleLines` makes `music.ts` refuse
+  when the voice was re-recorded without re-running `layout.ts`. Kokoro reads about 2.2 words a second at speed 1.
+- **Voice with feeling (Kokoro).** No emotion setting, so: a speed per line (≈0.82 for the dead, ≈1.08 for urgency),
+  `…` and `—` for pauses, short lines on their own ("Hundreds died."). Pick the voice by measuring, not guessing:
+  record the script in a few voices (`voice --voice x`) and compare the pitch spread within lines (autocorrelation F0,
+  semitones; flatter = stiffer). On Pinatubo: bm_fable 6.7, af_heart 6.2, am_fenrir 5.7, bm_george 4.8, am_michael
+  3.9. Compress the narration (−22 dBFS, 3:1) and master at −18 LUFS: speech peaks need the headroom, and export
+  brings the file to −14.
+- **Music: a cue sheet, not one track.** Cut several royalty-free cues to the story's acts (a drone for the calm, a
+  climbing pulse for the warning, a climax on the impact after a beat of silence, mournful for the aftermath, a lift
+  for the resolution). Level each cue by loudness but cap it by its own peaks (a climax's drums otherwise make the
+  limiter flatten the impact), cross them over ~1.2 s, cut hard on the impact, and pull the music almost to nothing
+  under the saddest line. FreePD has closed; Incompetech (Kevin MacLeod, CC BY 4.0, credit every track) serves direct
+  mp3s. Effects are drawn in code (`music/sfx`, `whatif/campsound`).
+
+## Ozone, 1996 (`apps/ozone`): a long-form documentary made in parts
+
+TrageDiaries-inspired, ~25 min, 16:9, on the Ozone Disco fire (Quezon City, 18 March 1996). The user asked to build it
+part by part and join at the end. **`apps/ozone/PROGRESS.md` is the working log: read it first, update it whenever a part
+changes state, a decision is made or a source turns up** (the user wants any new session to be able to continue). `parts.ts` holds the order (`ORDER`); each part is a folder `parts/<id>/` with
+`script.ts` (lines with `hold` and `sources`), `layout.gen.ts`, `shots.tsx`, `music.ts`. Steps:
+`npx tsx apps/ozone/part.ts <id> voice layout music render` (or `all`; `layout --estimate` before any voice), then
+`npx tsx apps/ozone/join.ts` (concat, CRF 24 `-tune film`, −14 LUFS) → `out/ozone-16x9.mp4`. Add a part: its folder,
+`ORDER`, and `films.ts`. Line ids are unique across the film.
+
+- **Look:** a white clay 3D reconstruction (`recon/scene.ts`, three.js, `--gl angle`; people are plain grey figures in
+  three poses, never faces; fire as light and smoke, not drawn flames), the drawn plan with every door's swing in red
+  (`Boards.tsx`), and the record (2008 PD photo, OSM street map, court quotes as quotations, never facsimiles).
+  `ozone-boards` renders one still per look.
+- **Layout** (`plan.ts`) is built only from what sources say, each line commented with its source; what no source
+  describes is hatched "no record". The 3D model and the plan both read it.
+- **Sound** (`sound.ts`): the club's own 90s house track (written in code), muffled through walls outside, dying with
+  the power (`powerDown`); cello/piano on VSCO samples; narration compressed and peak-limited per line.
+- **Windows:** `PartFilm.tsx` not `Part.tsx` (it would clash with `part.ts`).
 
 ## kop.it specifics
 

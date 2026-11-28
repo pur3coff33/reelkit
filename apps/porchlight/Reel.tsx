@@ -1,6 +1,7 @@
 // "Leave the Light On": one small world, 2:00, no words but the title.
 import type { Film } from "../../src/kit/looks/Film";
 import { SECONDS, paint, preview } from "./story";
+import { lowpolyPaint } from "./lowpoly";
 
 export const FILM: Film = {
   seconds: SECONDS,
@@ -17,3 +18,7 @@ export const PREVIEW: Film = { ...FILM, music: false, scenes: [{ from: 0, to: SE
 
 /** The four shots used to compare the look before and after: the hook, the old dog, the dog seeing the lamp, the light. */
 export const COMPARE = [0.3, 82.5, 87.5, 106];
+
+/** The same film drawn in low-poly (lowpoly.ts): a test of the look and the speed. */
+export const LOWPOLY: Film = { ...FILM, scenes: [{ from: 0, to: SECONDS, paint: lowpolyPaint }] };
+export const LOWPOLY_STILLS = [0.3, 18, 87.5, 113];

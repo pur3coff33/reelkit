@@ -468,7 +468,7 @@ const flash = (t: number) => LIGHTNING.reduce((a, at) => a + (t >= at && t < at 
 
 const HERO: [RGB, RGB, { legs: RGB }] = [[0.76, 0.3, 0.22], [0.28, 0.17, 0.1], { legs: [0.22, 0.27, 0.4] }];
 
-const world: BoxWorld = {
+export const world: BoxWorld = {
   land: LAND,
   quality: 0.62,
   lens: { aperture: 1, bloom: 0.55, grain: 0.06, vignette: 0.32, grade: (t) => gradeAt(t) },
@@ -667,8 +667,8 @@ function life(g: CanvasRenderingContext2D, t: number) {
   }
 }
 
-const painter = (w: BoxWorld): Painter => {
-  const picture = boxLook(w);
+/** Any picture of the world, with the chimney smoke, moths, weather and blinks over it. */
+export const dressed = (picture: Painter): Painter => {
   return (g, t) => {
     picture(g, t);
     life(g, t);
@@ -680,6 +680,7 @@ const painter = (w: BoxWorld): Painter => {
     }
   };
 };
+const painter = (w: BoxWorld) => dressed(boxLook(w));
 export const paint = painter(world);
 /** The same film, small and quick, for checking movement. */
 export const preview = painter({ ...world, quality: 0.22, tilt: 0 });

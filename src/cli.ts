@@ -6,7 +6,7 @@ import type { AppModule } from "./kit/config";
 import { appDir, ensureOut } from "./kit/paths";
 
 const [step, app, ...flags] = process.argv.slice(2);
-const STEPS = ["seed", "capture", "voice", "music", "beats", "render", "export", "reel", "studio", "post"] as const;
+const STEPS = ["seed", "capture", "voice", "music", "beats", "render", "export", "reel", "studio", "post", "fetch"] as const;
 
 function flag(name: string) {
   const i = flags.indexOf(`--${name}`);
@@ -56,6 +56,9 @@ async function main() {
         break;
       case "studio":
         await (await import("./kit/render")).studio(mod.config);
+        break;
+      case "fetch":
+        await (await import("./kit/doc/fetch")).fetchMedia(app);
         break;
       case "post":
         await (await import("./kit/post/facebook")).post(mod.config, flags);

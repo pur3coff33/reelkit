@@ -9,9 +9,10 @@ import { SR, svf } from "./synth";
 
 export type Spoken = { id: string; at: number; seconds: number; sound: Float32Array };
 
-/** Each line as the voice step left it, at the mix's sample rate, with when it starts. */
-export function readVoice(app: string, lines: VoiceLine[]): Spoken[] {
-  const file = outDir(app, "voice.json");
+/** Each line as the voice step left it, at the mix's sample rate, with when it starts. `manifest`: the voice step's .json,
+ *  relative to out/ (a film in parts has one per part). */
+export function readVoice(app: string, lines: VoiceLine[], manifest = "voice.json"): Spoken[] {
+  const file = outDir(app, manifest);
   if (!existsSync(file)) throw new Error(`no voice yet: run npm run voice -- ${app} first`);
   const made = (JSON.parse(readFileSync(file, "utf8")) as { lines: { id: string; file: string; seconds: number }[] }).lines;
   return lines.map((l) => {

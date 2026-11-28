@@ -51,3 +51,22 @@ describe("voice blends", () => {
     expect(voiceSlug("am_michael")).toBe("am_michael");
   });
 });
+
+describe("pronunciations", () => {
+  it("finds [word](/ipa/) and splits the line around it", async () => {
+    const { hasIpa, splitIpa } = await import("./kokoro");
+    expect(hasIpa("on Timog Avenue")).toBe(false);
+    expect(hasIpa("on [Timog](/timˈoɡ/) Avenue")).toBe(true);
+    expect(splitIpa("on [Timog](/timˈoɡ/) Avenue, [Quezon](/kˈɛsɔn/) City.")).toEqual([
+      { text: "on " }, { ipa: "timˈoɡ" }, { text: " Avenue, " }, { ipa: "kˈɛsɔn" }, { text: " City." },
+    ]);
+  });
+
+  it("phonemises the rest as kokoro-js would and keeps the given phonemes", async () => {
+    const { phonemesOf } = await import("./kokoro");
+    const out = await phonemesOf("A disco on [Timog](/timˈoɡ/) Avenue.", "en");
+    expect(out).toContain("timˈoɡ");
+    expect(out.endsWith(".")).toBe(true);
+    expect(out).not.toContain("[");
+  });
+});

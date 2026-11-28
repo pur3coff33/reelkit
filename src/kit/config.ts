@@ -27,6 +27,8 @@ export type ReelConfig = {
   requireRealNote?: boolean;
   /** Chromium's graphics renderer, for reels that draw with WebGL (the box look needs "swangle"). */
   gl?: "swangle" | "angle" | "egl" | "swiftshader";
+  /** "doc": export re-encodes small for photo footage (CRF 24, -tune film, AAC 192k) instead of copying the render. */
+  encode?: "doc";
   theme: Record<string, string>;
 };
 

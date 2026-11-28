@@ -15,6 +15,7 @@
     "reel": "tsx src/cli.ts reel",
     "studio": "tsx src/cli.ts studio",
     "post": "tsx src/cli.ts post",
+    "fetch": "tsx src/cli.ts fetch",
     "test": "vitest run",
     "typecheck": "tsc"
   },
@@ -28,11 +29,13 @@
     "playwright": "1.64.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "remotion": "4.0.538"
+    "remotion": "4.0.538",
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
+    "@types/three": "0.187.0",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.5"

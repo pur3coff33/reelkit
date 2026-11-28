@@ -14,6 +14,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ReelConfig } from "../config";
+import { frameTag } from "../frame";
 import { appDir, outDir, ROOT } from "../paths";
 
 type Mode = "check" | "draft" | "schedule" | "publish";
@@ -42,8 +43,10 @@ async function graph(method: "GET" | "POST", url: string, params: Record<string,
 }
 
 /** The file to post: the small upload copy if there is one, else the export. */
-function videoFile(app: string) {
-  for (const f of [outDir(app, `${app}-9x16-small.mp4`), outDir(app, `${app}-9x16.mp4`)]) if (existsSync(f)) return f;
+function videoFile(config: ReelConfig) {
+  const app = config.app, tags = [...new Set([frameTag(config), "9x16"])];
+  const files = tags.flatMap((t) => [outDir(app, `${app}-${t}-small.mp4`), outDir(app, `${app}-${t}.mp4`)]);
+  for (const f of files) if (existsSync(f)) return f;
   throw new Error(`no finished video for ${app}: run render and export first`);
 }
 
@@ -60,7 +63,7 @@ export async function post(config: ReelConfig, flags: string[]) {
   };
   const mode: Mode = flags.includes("--publish") ? "publish" : flags.includes("--draft") ? "draft" : value("schedule") ? "schedule" : "check";
   const app = config.app;
-  const file = videoFile(app), text = caption(app);
+  const file = videoFile(config), text = caption(app);
   const record = outDir(app, "post.json");
   if (mode !== "check" && existsSync(record) && !flags.includes("--again")) {
     const prev = JSON.parse(readFileSync(record, "utf8"));

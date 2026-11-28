@@ -5,20 +5,26 @@ import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ReelConfig } from "../config";
 import { ffmpeg } from "../ffmpeg";
+import { encodeArgs, extrasAllowed, frameTag } from "../frame";
 import { appDir, outDir } from "../paths";
 
 export async function exportReel(config: ReelConfig, extras: boolean) {
-  const raw = outDir(config.app, `${config.app}-9x16-raw.mp4`);
-  const final = outDir(config.app, `${config.app}-9x16.mp4`);
-  await ffmpeg(["-i", raw, "-t", String(config.seconds), "-c:v", "copy", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.84:level=false", "-ar", "48000", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", final]);
+  const name = `${config.app}-${frameTag(config)}`;
+  const raw = outDir(config.app, `${name}-raw.mp4`);
+  const final = outDir(config.app, `${name}.mp4`);
+  await ffmpeg(["-i", raw, "-t", String(config.seconds), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.84:level=false", "-ar", "48000", ...encodeArgs(config), "-movflags", "+faststart", final]);
   console.log(`  ✓ ${final}`);
   // The post notes (one-sentence captions, related affiliate products) go next to the video.
   const notes = join(appDir(config.app), "post.md");
   if (existsSync(notes)) {
-    copyFileSync(notes, outDir(config.app, `${config.app}-9x16.md`));
-    console.log(`  ✓ ${outDir(config.app, `${config.app}-9x16.md`)}`);
+    copyFileSync(notes, outDir(config.app, `${name}.md`));
+    console.log(`  ✓ ${outDir(config.app, `${name}.md`)}`);
   } else console.warn(`  ! no apps/${config.app}/post.md: write the captions and affiliate products (see CLAUDE.md)`);
   if (!extras) return;
+  if (!extrasAllowed(config)) {
+    console.log("  extras are for portrait reels: skipped");
+    return;
+  }
   const bg = (config.theme.bg ?? "#000000").replace("#", "0x");
   for (const [name, h] of [["1x1", 1080], ["4x5", 1350]] as const) {
     const file = outDir(config.app, `${config.app}-${name}.mp4`);

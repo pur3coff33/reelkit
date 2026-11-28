@@ -1,6 +1,7 @@
 // Rendering an app's reel with the Remotion CLI, with the app folder as the public dir. Also opens Remotion Studio.
 import { existsSync, readFileSync } from "node:fs";
 import type { ReelConfig } from "./config";
+import { frameTag } from "./frame";
 import { appDir, outDir, ROOT } from "./paths";
 import { run } from "./proc";
 
@@ -17,7 +18,7 @@ function checkNote(config: ReelConfig) {
 
 export async function render(config: ReelConfig) {
   checkNote(config);
-  const out = outDir(config.app, `${config.app}-9x16-raw.mp4`);
+  const out = outDir(config.app, `${config.app}-${frameTag(config)}-raw.mp4`);
   await run(
     "npx",
     // Its own port, so a render works while Studio has 3000.
